@@ -47,8 +47,8 @@ xM2 = xM(1:5:end);P2M2 = P2M(1:5:end);
 
 
 %% set up sliding window parameters
-Len = 50 ;% Window length, Length must larger than 5
-MoveF = 5;% Move frequence, 1 means move 1s per time
+Len = 100 ;% Window length, Length must larger than 5
+MoveF = 10;% Move frequence, 1 means move 1s per time
 % Generate pattern model
 [Straight,TR,TF,SR,SF] = GenerateModels(Len);
 
@@ -65,22 +65,12 @@ while i + Len -1 <= length(Time)
 %     plot(Time(i:i + Len),Ratio(i:i + Len),'g') 
 %     Filted = GaussianFilter(5,1,Ratio(i:i + Len)',10)'; % Filte window data
     Filted = MidFilter(9,Ratio(i:i + Len -1),5);
-    Filted = GaussianFilter(5,1,Filted',5)';  
+    Filted = GaussianFilter(5,1,Filted',5)';
+   
     figure(f2)
-    clf(figure(f2))
-    hold on
-    plot(Time(i:i + Len),Ratio(i:i + Len),'g') 
     plot(Time(i:i + Len-1),Filted,'r');            % plot filted result
-    hold off 
-    
     [DS,DTR,DTF,DSR,DSF] = Recognize(Filted,Straight,TR,TF,SR,SF);
-    
-    X = categorical({'Straight part','Turn Right','Turn Left','Switch Right','Switch Left'});
-    X = reordercats(X,{'Straight part','Turn Right','Turn Left','Switch Right','Switch Left'});
-    Y = [DS,DTR,DTF,DSR,DSF];
-    figure(f3)
-    bar(X,Y)
-    
+
     i = i + MoveF;
 end
     
