@@ -55,32 +55,85 @@ MoveF = 5;% Move frequence, 1 means move 1s per time
 %% Sliding window and detect
 Time = R(2:end,1)-R(2,1);
 Ratio = P2;
-f2 = figure('Name','Sliding Window');
-f3 = figure('Name','Likelyhood');
-
-i = 1;
-while i + Len -1 <= length(Time)
-
-%     plot(Time,Ratio,'b',Time(i:i + Len),Ratio(i:i + Len),'g')              % plot whole/window data
+f3 = figure('Name','Sliding Window');
+f4 = figure('Name','Likelyhood');
+% 
+% i = 1;
+% while i + Len -1 <= length(Time)
+% 
+% %     plot(Time,Ratio,'b',Time(i:i + Len),Ratio(i:i + Len),'g')              % plot whole/window data
+% %     plot(Time(i:i + Len),Ratio(i:i + Len),'g') 
+% %     Filted = GaussianFilter(5,1,Ratio(i:i + Len)',10)'; % Filte window data
+%     Filted = MidFilter(9,Ratio(i:i + Len -1),5);
+%     Filted = GaussianFilter(5,1,Filted',5)';  
+%     figure(f2)
+%     clf(figure(f2))
+%     hold on
 %     plot(Time(i:i + Len),Ratio(i:i + Len),'g') 
-%     Filted = GaussianFilter(5,1,Ratio(i:i + Len)',10)'; % Filte window data
-    Filted = MidFilter(9,Ratio(i:i + Len -1),5);
-    Filted = GaussianFilter(5,1,Filted',5)';  
-    figure(f2)
-    clf(figure(f2))
-    hold on
-    plot(Time(i:i + Len),Ratio(i:i + Len),'g') 
-    plot(Time(i:i + Len-1),Filted,'r');            % plot filted result
-    hold off 
+%     plot(Time(i:i + Len-1),Filted,'r');            % plot filted result
+%     hold off 
+%     
+%     [DS,DTR,DTF,DSR,DSF] = Recognize(Filted,Straight,TR,TF,SR,SF);
+%     
+%     X = categorical({'Straight part','Turn Right','Turn Left','Switch Right','Switch Left'});
+%     X = reordercats(X,{'Straight part','Turn Right','Turn Left','Switch Right','Switch Left'});
+%     Y = [DS,DTR,DTF,DSR,DSF];
+%     figure(f3)
+%     bar(X,Y)
+%     
+%     i = i + MoveF;
+% end
+
+%% Detect Interesting Part
+LargeWindow = 100; % Large window to detect a large area,smooth data
+Smallwindow = 9;  % Small window to detect the trend of signal whether it change a lot
+MoveF = 1;
+TS = 0.0001; %  Trend change Threshold
+HalfLength = fix(LargeWindow/2);
+RatioModified = [ones(HalfLength,1);Ratio;ones(HalfLength,1)]; % Add enough 1 at empty area;
+TimeExtend = linspace(0,5,50)';
+TimeModified = [TimeExtend - 5.1 ; Time ; TimeExtend + Time(end)];
+i = 1 + HalfLength;
+K1 = 0; K2 = 0;
+Kall = [];fArea = [];
+while i + Smallwindow <= length(P2) + HalfLength
+
+    LargePart = MidFilter(9,RatioModified(i - HalfLength:i + HalfLength - 1),5);
+    LargePart = GaussianFilter(5,1,LargePart',5)';
     
-    [DS,DTR,DTF,DSR,DSF] = Recognize(Filted,Straight,TR,TF,SR,SF);
+    DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + Smallwindow);
+    DetectResult = var(DetectPart)
     
-    X = categorical({'Straight part','Turn Right','Turn Left','Switch Right','Switch Left'});
-    X = reordercats(X,{'Straight part','Turn Right','Turn Left','Switch Right','Switch Left'});
-    Y = [DS,DTR,DTF,DSR,DSF];
     figure(f3)
-    bar(X,Y)
+    clf(figure(f3))
+    hold on
+    plot(TimeModified(i - HalfLength:i + HalfLength - 1),LargePart,'b')
+    plot(TimeModified(i : i + Smallwindow),DetectPart,'r')
+    hold off    
     
+    if DetectResult > TS
+       K2 = 1;   
+    elseif DetectResult <= TS
+       K2 = 0;       
+    end
+    
+    Kall = [Kall K2]; % Kall is not necessary in cpp
+    Kd = K2 - K1;
+    
+    if Kd == 1
+        StartPoint = i; % find when and where the signal changes
+    elseif Kd == -1
+        EndPoint = i;
+        fLen = EndPoint - StartPoint;
+        [Straight,TR,TF,SR,SF] = GenerateModels(fLen);
+        
+    end
+    
+    if StartPoint ~= 0
+        fArea = [fArea ; ]
+    end
+    
+    
+    K1 = K2;
     i = i + MoveF;
 end
-    
