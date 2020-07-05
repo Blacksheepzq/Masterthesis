@@ -1,4 +1,4 @@
-function [Straight,TR,TF,SR,SF] = GenerateModels(s)
+function [TR,TF,SR,SF] = GenerateModels(s)
 %function:according to the size of sliding window to generate related model
 %         Including straight line, switch left, switch right, turn right
 %         ,turn left
@@ -7,9 +7,7 @@ function [Straight,TR,TF,SR,SF] = GenerateModels(s)
 % is y coordinates
 x = (1:s)';
 
-%% Straight part
-Straight = ones(s,1) - 1;
-
+%% Straight part is not necessary
 %% Turn Right
 Line = fix(s/5);
 Curve = s - 2 * Line;
@@ -45,25 +43,21 @@ SF = MeanFilter(5,SF,5)' - 1;
 f2 = figure('Name','Signal Model');
 figure(f2)
 hold on
-subplot(2,3,1)
-plot(x,Straight);
-title('FeatureModel 1: Straight part')
-
-subplot(2,3,2)
+subplot(2,2,1)
 plot(x,TR);
-title('FeatureModel 2: Turn Right')
+title('FeatureModel 1: Turn Right')
 
-subplot(2,3,3)
+subplot(2,2,2)
 plot(x,TF);
-title('FeatureModel 3: Turn Left')
+title('FeatureModel 2: Turn Left')
 
-subplot(2,3,4)
+subplot(2,2,3)
 plot(x,SR);
-title('FeatureModel 4: Switch Right')
+title('FeatureModel 3: Switch Right')
 
-subplot(2,3,5)
+subplot(2,2,4)
 plot(x,SF);
-title('FeatureModel 5: Switch Left')
+title('FeatureModel 4: Switch Left')
 hold off
 end
 

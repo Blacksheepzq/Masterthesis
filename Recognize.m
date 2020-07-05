@@ -1,4 +1,4 @@
-function [DS,DTR,DTF,DSR,DSF] = Recognize(Target,Straight,TR,TF,SR,SF)
+function [DTR,DTF,DSR,DSF] = Recognize(Target,TR,TF,SR,SF)
 % FUNCTION: To recognize the signal of sliding window
 % Target : Original signal
 % Straight,TR,TF,SR,SF: Models
@@ -6,9 +6,7 @@ Target = Target-1;
 %% Generate Weight Data and amplitude of data
 Weight = (1 * 1);
 Amplitude = max(abs(Target));
-%% Straight part
-ProcessDataS = Target * 1 / max(Target); % To keep amplitude in a same size
-DS = norm( ( (Straight - ProcessDataS)) .* Weight);
+%% Straight part is not necessary in Recognition
 %% Turn Right
 ProcessDataTR = Target * max(abs(TR))/ Amplitude; % To keep amplitude in a same size
 DTR = norm( ( (TR - ProcessDataTR)).* Weight );

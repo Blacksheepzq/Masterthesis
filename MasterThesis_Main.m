@@ -50,7 +50,7 @@ xM2 = xM(1:5:end);P2M2 = P2M(1:5:end);
 Len = 50 ;% Window length, Length must larger than 5
 MoveF = 5;% Move frequence, 1 means move 1s per time
 % Generate pattern model
-[Straight,TR,TF,SR,SF] = GenerateModels(Len);
+[TR,TF,SR,SF] = GenerateModels(Len);
 
 %% Sliding window and detect
 Time = R(2:end,1)-R(2,1);
@@ -83,7 +83,6 @@ f4 = figure('Name','Likelyhood');
 %     
 %     i = i + MoveF;
 % end
-
 %% Detect Interesting Part
 LargeWindow = 100; % Large window to detect a large area,smooth data
 Smallwindow = 9;  % Small window to detect the trend of signal whether it change a lot
@@ -96,10 +95,11 @@ TimeModified = [TimeExtend - 5.1 ; Time ; TimeExtend + Time(end)];
 i = 1 + HalfLength;
 K1 = 0; K2 = 0;
 Kall = [];fArea = [];
+StartPoint = 0 ; EndPoint = 0;
 while i + Smallwindow <= length(P2) + HalfLength
 
     LargePart = MidFilter(9,RatioModified(i - HalfLength:i + HalfLength - 1),5);
-    LargePart = GaussianFilter(5,1,LargePart',5)';
+    LargePart = GaussianFilter(5,1,LargePart',1)';
     
     DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + Smallwindow);
     DetectResult = var(DetectPart)
@@ -124,14 +124,25 @@ while i + Smallwindow <= length(P2) + HalfLength
         StartPoint = i; % find when and where the signal changes
     elseif Kd == -1
         EndPoint = i;
-        fLen = EndPoint - StartPoint;
-        [Straight,TR,TF,SR,SF] = GenerateModels(fLen);
-        
+        fLen = EndPoint - StartPoint + 1;
+        [TR,TF,SR,SF] = GenerateModels(fLen);
     end
     
-    if StartPoint ~= 0
-        fArea = [fArea ; ]
+    if StartPoint ~=0 && EndPoint ~= 0
+        UnknowPart = RatioModified(StartPoint:EndPoint);
+%         plot(TimeModified(StartPoint:EndPoint),RatioModified(StartPoint:EndPoint))
+        [DTR,DTF,DSR,DSF] = Recognize(UnknowPart,TR,TF,SR,SF);
+        X = categorical({'Turn Right','Turn Left','Switch Right','Switch Left'});
+        X = reordercats(X,{'Turn Right','Turn Left','Switch Right','Switch Left'});
+        Y = [DTR,DTF,DSR,DSF];
+        figure(f4)
+        bar(X,Y)
+         StartPoint = 0 ; EndPoint = 0;
     end
+    
+%     if StartPoint ~= 0
+%         fArea = [fArea ; ]
+%     end
     
     
     K1 = K2;
