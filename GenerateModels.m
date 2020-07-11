@@ -40,24 +40,24 @@ ySF = sin(xSF) + 1;
 SF = [ones(1,Line),ySF,ones(1,Line)];
 SF = MeanFilter(5,SF,5)' - 1;
 
-f2 = figure('Name','Signal Model');
-figure(f2)
-hold on
-subplot(2,2,1)
-plot(x,TR);
-title('FeatureModel 1: Turn Right')
-
-subplot(2,2,2)
-plot(x,TF);
-title('FeatureModel 2: Turn Left')
-
-subplot(2,2,3)
-plot(x,SR);
-title('FeatureModel 3: Switch Right')
-
-subplot(2,2,4)
-plot(x,SF);
-title('FeatureModel 4: Switch Left')
-hold off
+% f2 = figure('Name','Signal Model');
+% figure(f2)
+% hold on
+% subplot(2,2,1)
+% plot(x,TR);
+% title('FeatureModel 1: Turn Right')
+% 
+% subplot(2,2,2)
+% plot(x,TF);
+% title('FeatureModel 2: Turn Left')
+% 
+% subplot(2,2,3)
+% plot(x,SR);
+% title('FeatureModel 3: Switch Right')
+% 
+% subplot(2,2,4)
+% plot(x,SF);
+% title('FeatureModel 4: Switch Left')
+% hold off
 end
 

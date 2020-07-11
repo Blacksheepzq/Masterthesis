@@ -5,7 +5,7 @@
 clc; close all;clear all;
 % run MasterThese_Initialization.m
 addpath(genpath('.'))
-R = load('../data/red box/R.txt');
+R = load('../data/red box/toR R tR R toL tR L L R toL R L.txt');
 Ldata = R(2:end,2) - R(1:end-1,2);
 Rdata = R(2:end,3) - R(1:end-1,3);
 P = R(:,2)./R(:,3);
@@ -47,10 +47,10 @@ xM2 = xM(1:5:end);P2M2 = P2M(1:5:end);
 
 
 %% set up sliding window parameters
-Len = 50 ;% Window length, Length must larger than 5
-MoveF = 5;% Move frequence, 1 means move 1s per time
-% Generate pattern model
-[TR,TF,SR,SF] = GenerateModels(Len);
+% Len = 50 ;% Window length, Length must larger than 5
+% MoveF = 5;% Move frequence, 1 means move 1s per time
+% % Generate pattern model
+% [TR,TF,SR,SF] = GenerateModels(Len);
 
 %% Sliding window and detect
 Time = R(2:end,1)-R(2,1);
@@ -85,9 +85,9 @@ f4 = figure('Name','Likelyhood');
 % end
 %% Detect Interesting Part
 LargeWindow = 100; % Large window to detect a large area,smooth data
-Smallwindow = 9;  % Small window to detect the trend of signal whether it change a lot
+Smallwindow = 19;  % Small window to detect the trend of signal whether it change a lot
 MoveF = 1;
-TS = 0.0001; %  Trend change Threshold
+TS = 0.0015; %  Trend change Threshold
 HalfLength = fix(LargeWindow/2);
 RatioModified = [ones(HalfLength,1);Ratio;ones(HalfLength,1)]; % Add enough 1 at empty area;
 TimeExtend = linspace(0,5,50)';
@@ -99,7 +99,7 @@ StartPoint = 0 ; EndPoint = 0;
 while i + Smallwindow <= length(P2) + HalfLength
 
     LargePart = MidFilter(9,RatioModified(i - HalfLength:i + HalfLength - 1),5);
-    LargePart = GaussianFilter(5,1,LargePart',1)';
+    LargePart = GaussianFilter(5,1,LargePart',5)';
     
     DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + Smallwindow);
     DetectResult = var(DetectPart)
@@ -123,7 +123,7 @@ while i + Smallwindow <= length(P2) + HalfLength
     if Kd == 1
         StartPoint = i; % find when and where the signal changes
     elseif Kd == -1
-        EndPoint = i;
+        EndPoint = i + Smallwindow;
         fLen = EndPoint - StartPoint + 1;
         [TR,TF,SR,SF] = GenerateModels(fLen);
     end
@@ -135,9 +135,14 @@ while i + Smallwindow <= length(P2) + HalfLength
         X = categorical({'Turn Right','Turn Left','Switch Right','Switch Left'});
         X = reordercats(X,{'Turn Right','Turn Left','Switch Right','Switch Left'});
         Y = [DTR,DTF,DSR,DSF];
+        
         figure(f4)
+        subplot(1,2,1)
+        plot(TimeModified(StartPoint:EndPoint),RatioModified(StartPoint:EndPoint),'b')
+        subplot(1,2,2)
         bar(X,Y)
-         StartPoint = 0 ; EndPoint = 0;
+        
+        StartPoint = 0 ; EndPoint = 0;
     end
     
 %     if StartPoint ~= 0
