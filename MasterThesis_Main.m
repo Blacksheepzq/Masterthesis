@@ -17,10 +17,10 @@
 % R = load('../../map data/Testdrive_27_07_20 - Kopie.txt'); %Real data 
 % R = load('../../map data/AllData_LL.txt'); %Real data 
 % SaveAsOSM('AllData',R,2,1);
-Ldata = R(2:end,4) - R(1:end-1,4);
-Rdata = R(2:end,5) - R(1:end-1,5);
+VL = R(2:end,4) - R(1:end-1,4);
+VR = R(2:end,5) - R(1:end-1,5);
 P = R(:,4)./R(:,5);
-P2 = Ldata./Rdata;
+P2 = VL./VR;
 
 
 % set NAN and infinite value as 1
@@ -33,7 +33,9 @@ P2(IndexINF) = 1;
 P2(P2 == 0) = 1;
 
 % Load map data
- 
+[NodeStruct,WayStruct,RelationStruct] = LoadOSM('../../map data/Map_Boundary.osm');
+[NodeX,NodeY,Zone] = deg2utm(NodeStruct(:,2),NodeStruct(:,3));
+NodeStruct(:,4) = NodeX; NodeStruct(:,5) = NodeY;
 %% Filte Whole signal
 WholeMid = MidFilter(9,P2,3); % Mid - value filter , to eliminate error
 WholeGauss = GaussianFilter(5,1,WholeMid',5)'; % Gaussian filter, to smooth shape
@@ -78,11 +80,11 @@ while i + Smallwindow <= length(P2) + LargeWindow
 % LargePart to filte related signal
     LargePart = MidFilter(9,RatioModified(i - HalfLength:i + HalfLength - 1),5);% (i - HalfLength) is the location in original data
     LargePart = GaussianFilter(5,1,LargePart',5)';% Midfilter for deleting outliar, GuassianFilter for smoothing signal
-    RSmoothed(i - HalfLength) = LargePart(HalfLength + 1);
+
 % Detected Part to detect change
     DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + Smallwindow); % Detect the chang of signal
     DetectResult = var(DetectPart)
-    
+    RSmoothed(i - HalfLength:i - HalfLength + Smallwindow) = DetectPart;
     
     figure(f3) % Show Sliding Window
     clf(figure(f3))
@@ -112,22 +114,28 @@ while i + Smallwindow <= length(P2) + LargeWindow
     elseif Kd == -1
         EndPoint = i + Smallwindow;
         fLen = EndPoint - StartPoint + 1;
-        [TR,TF,SR,SF] = GenerateModels(fLen);
+        [TR,TF,SR,SF] = GenerateModels(fLen,Smallwindow);
     end
     
     if StartPoint ~=0 && EndPoint ~= 0
-        UnknowPart = RatioModified(StartPoint:EndPoint);
+%         UnknowPart = RatioModified(StartPoint:EndPoint);
+        UnknowPart = RSmoothed(StartPoint - HalfLength:EndPoint - HalfLength);
+        RelatedData = R(StartPoint - HalfLength :EndPoint - HalfLength + 1,:);
 %         plot(TimeModified(StartPoint:EndPoint),RatioModified(StartPoint:EndPoint))
-        [DTR,DTF,DSR,DSF] = Recognize(UnknowPart,TR,TF,SR,SF);
+        [DTR,DTL,DSR,DSL] = Recognize(UnknowPart,TR,TF,SR,SF);
         X = categorical({'Turn Right','Turn Left','Switch Right','Switch Left'});
         X = reordercats(X,{'Turn Right','Turn Left','Switch Right','Switch Left'});
-        Y = [DTR,DTF,DSR,DSF];
+        Y = [DTR,DTL,DSR,DSL]; Type = find(Y == min(Y)); % point out the result;1 for turn right,2 for turn right
+        
         
         figure(f4)
         subplot(1,2,1)
-        plot(TimeModified(StartPoint:EndPoint),RatioModified(StartPoint:EndPoint),'b')
+        plot(TimeModified(StartPoint:EndPoint),UnknowPart,'b')
         subplot(1,2,2)
         bar(X,Y)
+        
+        
+        
         
         StartPoint = 0 ; EndPoint = 0;
     end
