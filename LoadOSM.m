@@ -56,16 +56,18 @@ for i = 0 : RelationArray.getLength - 1
     end
      RelationStruct{i+1,2} = Member;
      
-     Tag = cell(4,1); % save tag data
+     Tag = cell(5,1); % save tag data
      for j = 0 : RelationArray.item(i).getElementsByTagName('tag').getLength -1
          if RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('k') == 'lanes'
              Tag{1,1} = RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('v');
-         elseif RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('k') == 'speed'
-             Tag{2,1} = str2double(RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('v'));
+         elseif RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('k') == 'Nextlane'
+             Tag{2,1} = RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('v');
          elseif RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('k') == 'type'
              Tag{3,1} = RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('v');
          elseif RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('k') == 'road_level'
              Tag{4,1} = str2double(RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('v'));
+         elseif RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('k') == 'speed'
+             Tag{5,1} = str2double(RelationArray.item(i).getElementsByTagName('tag').item(j).getAttribute('v'));
          end
      end
      RelationStruct{i+1,3} = Tag;

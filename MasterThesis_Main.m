@@ -36,6 +36,7 @@ P2(P2 == 0) = 1;
 [NodeStruct,WayStruct,RelationStruct] = LoadOSM('../../map data/Map_Boundary.osm');
 [NodeX,NodeY,Zone] = deg2utm(NodeStruct(:,2),NodeStruct(:,3));
 NodeStruct(:,4) = NodeX; NodeStruct(:,5) = NodeY;
+scatter(NodeX,NodeY);
 %% Filte Whole signal
 WholeMid = MidFilter(9,P2,3); % Mid - value filter , to eliminate error
 WholeGauss = GaussianFilter(5,1,WholeMid',5)'; % Gaussian filter, to smooth shape
@@ -76,7 +77,7 @@ Kall = [];fArea = [];
 StartPoint = 0 ; EndPoint = 0;
 RSmoothed = [];
 % Real time simulation
-while i + Smallwindow <= length(P2) + LargeWindow
+while i + Smallwindow <= length(P2) + HalfLength + 1
 % LargePart to filte related signal
     LargePart = MidFilter(9,RatioModified(i - HalfLength:i + HalfLength - 1),5);% (i - HalfLength) is the location in original data
     LargePart = GaussianFilter(5,1,LargePart',5)';% Midfilter for deleting outliar, GuassianFilter for smoothing signal
@@ -85,6 +86,7 @@ while i + Smallwindow <= length(P2) + LargeWindow
     DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + Smallwindow); % Detect the chang of signal
     DetectResult = var(DetectPart)
     RSmoothed(i - HalfLength:i - HalfLength + Smallwindow) = DetectPart;
+    
     
     figure(f3) % Show Sliding Window
     clf(figure(f3))
@@ -97,7 +99,7 @@ while i + Smallwindow <= length(P2) + LargeWindow
     clf(figure(f5))
     hold on
     plot(R(2:end,6),R(2:end,7),'b')
-    plot(R(i - HalfLength:i - HalfLength + Smallwindow,6),R(i - HalfLength:i - HalfLength + Smallwindow,7),'r')
+    plot(R(i - HalfLength:i - HalfLength + Smallwindow - 1 ,6),R(i - HalfLength:i - HalfLength + Smallwindow - 1,7),'r')
     hold off 
     
     if DetectResult > TS
@@ -133,6 +135,8 @@ while i + Smallwindow <= length(P2) + LargeWindow
         plot(TimeModified(StartPoint:EndPoint),UnknowPart,'b')
         subplot(1,2,2)
         bar(X,Y)
+        
+        
         
         
         
