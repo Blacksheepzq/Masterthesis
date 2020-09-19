@@ -123,6 +123,7 @@ while i + Smallwindow <= length(P2) + HalfLength + 1
 %         UnknowPart = RatioModified(StartPoint:EndPoint);
         UnknowPart = RSmoothed(StartPoint - HalfLength:EndPoint - HalfLength);
         RelatedData = R(StartPoint - HalfLength :EndPoint - HalfLength,:);
+%         plot(TimeModified(StartPoint:EndPoint),RatioModified(StartPoint:EndPoint))
         [DTR,DTL,DSR,DSL] = Recognize(UnknowPart,TR,TF,SR,SF);
         X = categorical({'Turn Right','Turn Left','Switch Right','Switch Left'});
         X = reordercats(X,{'Turn Right','Turn Left','Switch Right','Switch Left'});

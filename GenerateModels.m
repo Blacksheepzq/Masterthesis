@@ -2,10 +2,9 @@ function [TR,TL,SR,SL] = GenerateModels(s,Smallwindow)
 %function:according to the size of sliding window to generate related model
 %         Including switch left, switch right, turn right, turn left
 % s: Model size
-x = (1:s)';
 
 %% Straight part is not necessary
-SP = zeros(s,1);
+% SP = zeros(s,1);
 %% Turn Right
 Line = fix(Smallwindow/2);
 Curve = s - 2 * Line;

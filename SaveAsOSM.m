@@ -2,7 +2,7 @@ function SaveAsOSM(name,data,a,b)
 % Transfer data to XML(OSM) file 
 % Name is the saved file's name (like, 'NewFile')
 % data is import data. a,b are longitude and latitude line in original file
-% (For example: First and second are lon and lat,then a,b is 1 and 2)
+% (For example: First and second columns are lon and lat,then a,b is 1 and 2)
 
 n = length(data);
 tempname = char(name) ; 
