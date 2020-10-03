@@ -45,6 +45,9 @@ SumDf = sum(Df); SumDs = sum(Ds);
 D = sqrt(SumDf^2 + SumDs^2);
 
 sqrt((R(end,6) - R(1,6))^2 + (R(end,7) - R(1,7))^2)
+sqrt((R(100,6) - R(1,6))^2 + (R(100,7) - R(1,7))^2)
+
+
 
 x1 = R(1,6); y1 = R(1,7);
 x2 = R(2,6); y2 = R(2,7);

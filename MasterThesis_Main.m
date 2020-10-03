@@ -36,8 +36,18 @@ P2(P2 == 0) = 1;
 [NodeData,WayData,RelationData] = LoadOSM('../../map data/Map_Boundary.osm');
 [NodeData,WayData,RelationData] = PreProcessMapData(NodeData,WayData,RelationData);
 [OriginRelationID,OriginLocData] = FindLocation(NodeData,WayData,RelationData,R(1,6),R(1,7));
+RestDistance = OriginLocData(1) * (1 - OriginLocData(2)); % After figure out start point location then how far it is to next lane
 scatter(NodeData(:,4),NodeData(:,5));
-%% Filte Whole signal
+
+% odo parameter
+xy = R(:,6:7);
+seglen = sqrt(sum(diff(xy,[],1).^2,2));
+GPSDis = sum(seglen);
+% KL = 0.00281377367;
+% KR = 0.00281570245;
+KL = 0.003077;
+KR = 0.003083;
+%% Filte Whole signal for show
 WholeMid = MidFilter(9,P2,3); % Mid - value filter , to eliminate error
 WholeGauss = GaussianFilter(5,1,WholeMid',5)'; % Gaussian filter, to smooth shape
 f1 = figure('Name','Whole Signal,Middel Filter first then Gaussian Filter');
@@ -55,102 +65,203 @@ hold on
     plot(R(2:end,6),R(2:end,7))
 hold off
 
-%% Sliding window and detect
+% Sliding window and detect
 Time = R(2:end,1)-R(2,1);
 Ratio = P2;
 f3 = figure('Name','Sliding Window');
 f4 = figure('Name','Likelyhood');
 
-%% Detect Interesting Part
+%% Detect Pattern Part
 % Parameter
 LargeWindow = 150; % Large window to detect a large area,smooth data
-Smallwindow = 19;  % Small window to detect the trend of signal whether it change a lot
-MoveF = 1;
-TS = 0.000011; %  Trend change Threshold 0.000011 is worked in Target1
-HalfLength = fix(LargeWindow/2);
+SmallWindow = 19;  % Small window to detect the trend of signal whether it change a lot
+MoveF = 1; % step length, each time input a row data
+TS = 0.000011; %  Trend change Threshold, 0.000011 is worked in Target1
+HalfLength = fix(LargeWindow/2); % add half length of large window to before starting and after ending part
 RatioModified = [ones(HalfLength,1);Ratio;ones(HalfLength,1)]; % Add enough 1 at empty area;
 TimeExtend = linspace(0,HalfLength/10,HalfLength)';
 TimeModified = [TimeExtend - HalfLength/10 - 0.1 ; Time ; TimeExtend + Time(end)];
-i = 1 + HalfLength;
-K1 = 0; K2 = 0;
-Kall = [];fArea = [];
-StartPoint = 0 ; EndPoint = 0;
+i = 1 + HalfLength; % (i - HalfLength) is the location in original data
+NormalStartPoint = i;
+K1 = 0; K2 = 0; % Triger of segment detection
+Kall = [];
+PatternStartPoint = 0 ; PatternEndPoint = 0;
+StraightStartPoint = 1 + HalfLength; StraightEndPoint = StraightStartPoint;
+PresentID = OriginRelationID; 
+Lanes = RelationData(ismember([RelationData.ID],PresentID)).Tag{1}; Lanes = str2double(strsplit(string(Lanes),'.'));
+NextLanes = RelationData(ismember([RelationData.ID],PresentID)).Tag{2}; NextLanes = str2double(strsplit(string(NextLanes),'.'));
 RSmoothed = [];
-% Real time simulation
-while i + Smallwindow <= length(P2) + HalfLength + 1
+PatternDistance = 0;
+%% Real time simulation
+while i + SmallWindow <= length(P2) + HalfLength + 1
+%% Smooth data part 
 % LargePart to filte related signal
     LargePart = MidFilter(9,RatioModified(i - HalfLength:i + HalfLength - 1),5);% (i - HalfLength) is the location in original data
     LargePart = GaussianFilter(5,1,LargePart',5)';% Midfilter for deleting outliar, GuassianFilter for smoothing signal
 
 % Detected Part to detect change
-    DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + Smallwindow); % Detect the chang of signal
-    DetectResult = var(DetectPart)
-    RSmoothed(i - HalfLength:i - HalfLength + Smallwindow) = DetectPart;
+    DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + SmallWindow); % Detect the chang of signal
+    DetectResult = var(DetectPart);
+    RSmoothed(i - HalfLength:i - HalfLength + SmallWindow) = DetectPart;
+    
+%% Segmentation part 
+if DetectResult > TS
+   K2 = 1;   
+elseif DetectResult <= TS
+   K2 = 0;       
+end
+
+Kall = [Kall K2];
+Kd = K2 - K1;
+
+if Kd == 1
+    PatternStartPoint = i; % find when and where the signal changes
+elseif Kd == -1
+    PatternEndPoint = i + SmallWindow;
+    fLen = PatternEndPoint - PatternStartPoint + 1;
+    [TR,TF,SR,SF] = GenerateModels(fLen,SmallWindow);
+    StraightStartPoint = PatternEndPoint;
+end
+
+ 
+%% Recongition and calculation
+if PatternStartPoint ~=0 && PatternEndPoint ~= 0
+%         UnknowPart = RatioModified(StartPoint:EndPoint);
+    UnknowPart = RSmoothed(PatternStartPoint - HalfLength:PatternEndPoint - HalfLength);
+    RelatedData = R(PatternStartPoint - HalfLength :PatternEndPoint - HalfLength,:);
+    [DTR,DTL,DSR,DSL] = Recognize(UnknowPart,TR,TF,SR,SF);
+    X = categorical({'Turn Right','Turn Left','Switch Right','Switch Left'});
+    X = reordercats(X,{'Turn Right','Turn Left','Switch Right','Switch Left'});
+    Y = [DTR,DTL,DSR,DSL]; Type = find(Y == min(Y)); % point out the result;1 for turn right,2 for turn right
+    [ForwardDis,SideDis,Angle] = PatterDistanceCalculation(RelatedData,UnknowPart,KL);
+%     PatternDistance = ForwardDis;
+    PatternDistance = ((RelatedData(end,4) - RelatedData(1,4))*KL + (RelatedData(end,5) - RelatedData(end,5))*KR) / 2;
+    
+    figure(f4)
+    subplot(1,2,1)
+    plot(TimeModified(PatternStartPoint:PatternEndPoint),UnknowPart,'b')
+    subplot(1,2,2)
+    bar(X,Y)
+    
+    PatternStartPoint = 0 ; PatternEndPoint = 0;
+end
+    
+%% Distance and location calculation  
+if PatternDistance == 0 % when car go straight and did not detect switching or turning
+   while DriveDistance >= RestDistance  % is it in next lane?
+       if length(NextLanes) == 1 % how many possible of next lane? 1 or more? 
+           %Updata relation id information
+           PresentID = NextLanes;% change the car location relation now
+           [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);               
+           DriveDistance = DriveDistance - RestDistance;
+           RestDistance = LaneDistance - DriveDistance;
+           StraightStartPoint = i;
+        elseif length(NextLanes) >1 
+           [PesentID] = FindStraightLane(NextLanes,RelationData);
+           [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData); 
+           DriveDistance = DriveDistance - RestDistance;
+           RestDistance = LaneDistance - DriveDistance;
+           StraightStartPoint = i;
+       end
+   end
+   
+elseif  PatternDistance ~= 0
+    RestDistance = LaneDistance - DriveDistance;
+    PresentLoc = find(Lanes == PresentID);
+    if Type == 3 % switch right        
+        if PresentLoc ~= length(Lanes) % if the relation is not the rightest one ,then switch to right lane
+            PresentID = Lanes(PresentLoc + 1);
+            [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);
+        end
+        if RestDistance > PatternDistance
+           RestDistance = RestDistance - PatternDistance;
+        elseif RestDistance <= PatternDistance
+            if length(NextLanes) == 1 % how many possible of next lane? 1 or more?                
+               PresentID = NextLanes;% change the car location relation now
+               [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);               
+               PatternDistance = PatternDistance - RestDistance;
+               RestDistance = LaneDistance - PatternDistance;
+               StraightStartPoint = i;
+            elseif length(NextLanes) >1 
+               [PesentID] = FindStraightLane(NextLanes,RelationData);
+               [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData); 
+               PatternDistance = PatternDistance - RestDistance;
+               RestDistance = LaneDistance - PatternDistance;
+               StraightStartPoint = i;
+           end
+        end
+
+    elseif Type == 4 % switch left
+        if PresentLoc ~= 1 % if the relation is not the leftest one ,then switch to left lane
+            PresentID = Lanes(PresentLoc - 1);
+            [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData); 
+        end
+        if RestDistance > PatternDistance
+           RestDistance = RestDistance - PatternDistance;
+        elseif RestDistance <= PatternDistance
+            if length(NextLanes) == 1 % how many possible of next lane? 1 or more?                
+               PresentID = NextLanes;% change the car location relation now
+               [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);               
+               PatternDistance = PatternDistance - RestDistance;
+               RestDistance = LaneDistance - PatternDistance;
+               StraightStartPoint = i;
+            elseif length(NextLanes) >1 
+               [PesentID] = FindStraightLane(NextLanes,RelationData);
+               [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData); 
+               PatternDistance = PatternDistance - RestDistance;
+               RestDistance = LaneDistance - PatternDistance;
+               StraightStartPoint = i;
+           end
+        end
+    elseif Type == 1 || Type == 2 %turn right or turn left
+           length = length(Angle);
+           [PresentID] = MatchTurning(Lanes,NextLanes,RelationData,Angle)
+    end
+
+%     while D > RestDistance
+%         if length(NextLanes) == 1 % how many possible of next lane? 1 or more?
+%            %Updata relation id information
+%            PresentID = NextLanes;% change the car location relation now
+%            [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID);
+%           
+%        elseif length(NextLanes) >1 % more than one possible
+%            Similar = [];
+%            for k = 1:length(NextLanes)
+%                AngleOfLane = RelationData(ismember([RelationData.ID],NextLanes(k))).AngleOfRelation;
+%                AngleOfLane = AngleOfLane(:) - AngleOfLane(1); % because odo angle data will start with 0 degree
+% %                AngleOfLane = interp1(AngleOfLane,)
+%            end
+%        end
+%        D = D - RestDistance;
+%        RestDistance = RelationData(ismember([RelationData.ID],PresentID)).Distance;      
+%     end
+end
     
     
+ %% Draw the situation now        
     figure(f3) % Show Sliding Window
     clf(figure(f3))
     hold on
     plot(TimeModified(i - HalfLength:i + HalfLength - 1),LargePart,'b')
-    plot(TimeModified(i : i + Smallwindow),DetectPart,'r')
+    plot(TimeModified(i : i + SmallWindow),DetectPart,'r')
     hold off    
 
     figure(f5) % Show Trakectory Window
     clf(figure(f5))
     hold on
+    title(['Present Location:' ,num2str(PresentID), ', Next possible location:',num2str(NextLanes)])
     plot(R(2:end,6),R(2:end,7),'b')
-    plot(R(i - HalfLength:i - HalfLength + Smallwindow - 1 ,6),R(i - HalfLength:i - HalfLength + Smallwindow - 1,7),'r')
+    plot(R(i - HalfLength:i - HalfLength + SmallWindow - 1 ,6),R(i - HalfLength:i - HalfLength + SmallWindow - 1,7),'r')
+%     PlotRelation(PresentID,WayData,RelationData)
+%     PlotRelation(NextLanes,WayData,RelationData)
     hold off 
     
-    if DetectResult > TS
-       K2 = 1;   
-    elseif DetectResult <= TS
-       K2 = 0;       
-    end
-    
-    Kall = [Kall K2]; % Kall is not necessary in cpp
-    Kd = K2 - K1;
-    
-    if Kd == 1
-        StartPoint = i; % find when and where the signal changes
-    elseif Kd == -1
-        EndPoint = i + Smallwindow;
-        fLen = EndPoint - StartPoint + 1;
-        [TR,TF,SR,SF] = GenerateModels(fLen,Smallwindow);
-    end
-    
-    if StartPoint ~=0 && EndPoint ~= 0
-%         UnknowPart = RatioModified(StartPoint:EndPoint);
-        UnknowPart = RSmoothed(StartPoint - HalfLength:EndPoint - HalfLength);
-        RelatedData = R(StartPoint - HalfLength :EndPoint - HalfLength,:);
-        [DTR,DTL,DSR,DSL] = Recognize(UnknowPart,TR,TF,SR,SF);
-        X = categorical({'Turn Right','Turn Left','Switch Right','Switch Left'});
-        X = reordercats(X,{'Turn Right','Turn Left','Switch Right','Switch Left'});
-        Y = [DTR,DTL,DSR,DSL]; Type = find(Y == min(Y)); % point out the result;1 for turn right,2 for turn right
-        
-        
-        figure(f4)
-        subplot(1,2,1)
-        plot(TimeModified(StartPoint:EndPoint),UnknowPart,'b')
-        subplot(1,2,2)
-        bar(X,Y)
-        
-
-        StartPoint = 0 ; EndPoint = 0;
-    end
+%% finish this loop, Clear data and step into next loop
+if K2 == 0
+    StraightEndPoint = i + SmallWindow;
+    DriveDistance = (R(StraightEndPoint  - HalfLength,4) - R(StraightStartPoint - HalfLength,4)) * KL
+end   
+    PatternDistance = 0;
     K1 = K2;
-    
-    % Calculate the forward distance(Decide which way car is now)
-    xy = R(1:150,6:7);
-    seglen = sqrt(sum(diff(xy,[],1).^2,2));
-    D = cumsum(seglen);
-    KL = R(1:150,4) - R(1,4);
-    KR = R(1:150,5) - R(1,5);
-    
-    
-    % Car position
-    
-    
-    
     i = i + MoveF;
 end

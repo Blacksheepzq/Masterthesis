@@ -54,7 +54,8 @@ for i = 1:size(RelationData,2)
     left = RelationData(i).Member{1};
     right = RelationData(i).Member{2};
     Distance = (WayData(ismember([WayData.ID],left)).Distence + WayData(ismember([WayData.ID],right)).Distence) / 2;
-    RelationData(i).Distence = Distance; % [m]
+    RelationData(i).Distance = Distance; % [m]
+    RelationData(i).AngleOfRelation = WayData(ismember([WayData.ID] , left)).AngleOfTwoPoints;
 end
 
 
