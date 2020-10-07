@@ -82,3 +82,10 @@ hold on
 plot(X,Y,'b')
 plot(R(:,6),R(:,7),'r')
 hold off
+%%%
+VL = diff(R(:,4)) * KL;
+DL = sum(VL)
+
+Dx = diff(R(:,6));Dy = diff(R(:,7));
+Ds = sqrt(Dx.^2 + Dy.^2);
+D = sum(Ds)

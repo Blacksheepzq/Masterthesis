@@ -31,7 +31,7 @@ for i = 1:size(WayData,2)
         diffD = sqrt(diffx.^2 + diffy.^2);
         D = sum(diffD);
         WayData(i).Distence = D;
-        plot(WayCoor(:,2) , WayCoor(:,3))
+%         plot(WayCoor(:,2) , WayCoor(:,3))
         % Angle Part
         AngleOfTwoPoints = atan2(diffx,diffy) * 180 / pi;
         diffAngle = AngleOfTwoPoints(2:end) - AngleOfTwoPoints(1:end-1);

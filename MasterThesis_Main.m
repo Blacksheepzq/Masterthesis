@@ -15,7 +15,8 @@
 
 % Real odometer data
 % R = load('../../map data/Testdrive_27_07_20 - Kopie.txt'); %Real data 
-% R = load('../../map data/AllData_LL.txt'); %Real data 
+% load('Target.mat'); %Real data 
+% R = Target;
 % SaveAsOSM('AllData',R,2,1);
 VL = R(2:end,4) - R(1:end-1,4);
 VR = R(2:end,5) - R(1:end-1,5);
@@ -37,7 +38,7 @@ P2(P2 == 0) = 1;
 [NodeData,WayData,RelationData] = PreProcessMapData(NodeData,WayData,RelationData);
 [OriginRelationID,OriginLocData] = FindLocation(NodeData,WayData,RelationData,R(1,6),R(1,7));
 RestDistance = OriginLocData(1) * (1 - OriginLocData(2)); % After figure out start point location then how far it is to next lane
-scatter(NodeData(:,4),NodeData(:,5));
+% scatter(NodeData(:,4),NodeData(:,5));
 
 % odo parameter
 xy = R(:,6:7);
@@ -76,7 +77,7 @@ f4 = figure('Name','Likelyhood');
 LargeWindow = 150; % Large window to detect a large area,smooth data
 SmallWindow = 19;  % Small window to detect the trend of signal whether it change a lot
 MoveF = 1; % step length, each time input a row data
-TS = 0.000011; %  Trend change Threshold, 0.000011 is worked in Target1
+TS = 0.0000015; %  Trend change Threshold, 0.0000015 is worked in Target1
 HalfLength = fix(LargeWindow/2); % add half length of large window to before starting and after ending part
 RatioModified = [ones(HalfLength,1);Ratio;ones(HalfLength,1)]; % Add enough 1 at empty area;
 TimeExtend = linspace(0,HalfLength/10,HalfLength)';
@@ -91,9 +92,10 @@ PresentID = OriginRelationID;
 Lanes = RelationData(ismember([RelationData.ID],PresentID)).Tag{1}; Lanes = str2double(strsplit(string(Lanes),'.'));
 NextLanes = RelationData(ismember([RelationData.ID],PresentID)).Tag{2}; NextLanes = str2double(strsplit(string(NextLanes),'.'));
 RSmoothed = [];
-PatternDistance = 0;
+PatternDistance = 0;DriveDistance = 0;
+SignalLength = length(P2) + HalfLength + 1;
 %% Real time simulation
-while i + SmallWindow <= length(P2) + HalfLength + 1
+while i + SmallWindow <= SignalLength
 %% Smooth data part 
 % LargePart to filte related signal
     LargePart = MidFilter(9,RatioModified(i - HalfLength:i + HalfLength - 1),5);% (i - HalfLength) is the location in original data
@@ -101,7 +103,7 @@ while i + SmallWindow <= length(P2) + HalfLength + 1
 
 % Detected Part to detect change
     DetectPart = LargePart( HalfLength + 1: HalfLength + 1 + SmallWindow); % Detect the chang of signal
-    DetectResult = var(DetectPart);
+    DetectResult = var(DetectPart)
     RSmoothed(i - HalfLength:i - HalfLength + SmallWindow) = DetectPart;
     
 %% Segmentation part 
@@ -155,13 +157,13 @@ if PatternDistance == 0 % when car go straight and did not detect switching or t
            [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);               
            DriveDistance = DriveDistance - RestDistance;
            RestDistance = LaneDistance - DriveDistance;
-           StraightStartPoint = i;
+           StraightStartPoint = i + SmallWindow;
         elseif length(NextLanes) >1 
            [PesentID] = FindStraightLane(NextLanes,RelationData);
            [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData); 
            DriveDistance = DriveDistance - RestDistance;
            RestDistance = LaneDistance - DriveDistance;
-           StraightStartPoint = i;
+           StraightStartPoint = i + SmallWindow;
        end
    end
    
@@ -181,13 +183,12 @@ elseif  PatternDistance ~= 0
                [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);               
                PatternDistance = PatternDistance - RestDistance;
                RestDistance = LaneDistance - PatternDistance;
-               StraightStartPoint = i;
+               StraightStartPoint = i + SmallWindow;
             elseif length(NextLanes) >1 
-               [PesentID] = FindStraightLane(NextLanes,RelationData);
-               [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData); 
+               [PesentID,Lanes,NextLanes,LaneDistance] = FindStraightLane(NextLanes,RelationData);
                PatternDistance = PatternDistance - RestDistance;
                RestDistance = LaneDistance - PatternDistance;
-               StraightStartPoint = i;
+               StraightStartPoint = i + SmallWindow;
            end
         end
 
@@ -204,37 +205,34 @@ elseif  PatternDistance ~= 0
                [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);               
                PatternDistance = PatternDistance - RestDistance;
                RestDistance = LaneDistance - PatternDistance;
-               StraightStartPoint = i;
+               StraightStartPoint = i + SmallWindow;
             elseif length(NextLanes) >1 
-               [PesentID] = FindStraightLane(NextLanes,RelationData);
-               [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData); 
+               [PesentID,Lanes,NextLanes,LaneDistance] = FindStraightLane(NextLanes,RelationData);
                PatternDistance = PatternDistance - RestDistance;
                RestDistance = LaneDistance - PatternDistance;
-               StraightStartPoint = i;
+               StraightStartPoint = i + SmallWindow;
            end
         end
     elseif Type == 1 || Type == 2 %turn right or turn left
-           length = length(Angle);
-           [PresentID] = MatchTurning(Lanes,NextLanes,RelationData,Angle)
+           [PresentID,Lanes,NextLanes,LaneDistance] = MatchTurning(Lanes,NextLanes,RelationData,Angle,SmallWindow);
+           RestDistance = LaneDistance - DriveDistance;
+        if RestDistance > PatternDistance
+           RestDistance = RestDistance - PatternDistance;
+        elseif RestDistance <= PatternDistance
+            if length(NextLanes) == 1 % how many possible of next lane? 1 or more?                
+               PresentID = NextLanes;% change the car location relation now
+               [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID,RelationData);               
+               PatternDistance = PatternDistance - RestDistance;
+               RestDistance = LaneDistance - PatternDistance;
+               StraightStartPoint = i + SmallWindow;
+            elseif length(NextLanes) >1 
+               [PesentID,Lanes,NextLanes,LaneDistance] = FindStraightLane(NextLanes,RelationData);
+               PatternDistance = PatternDistance - RestDistance;
+               RestDistance = LaneDistance - PatternDistance;
+               StraightStartPoint = i + SmallWindow;
+           end
+        end
     end
-
-%     while D > RestDistance
-%         if length(NextLanes) == 1 % how many possible of next lane? 1 or more?
-%            %Updata relation id information
-%            PresentID = NextLanes;% change the car location relation now
-%            [Lanes,NextLanes,LaneDistance] = IDRelateData(PresentID);
-%           
-%        elseif length(NextLanes) >1 % more than one possible
-%            Similar = [];
-%            for k = 1:length(NextLanes)
-%                AngleOfLane = RelationData(ismember([RelationData.ID],NextLanes(k))).AngleOfRelation;
-%                AngleOfLane = AngleOfLane(:) - AngleOfLane(1); % because odo angle data will start with 0 degree
-% %                AngleOfLane = interp1(AngleOfLane,)
-%            end
-%        end
-%        D = D - RestDistance;
-%        RestDistance = RelationData(ismember([RelationData.ID],PresentID)).Distance;      
-%     end
 end
     
     
@@ -252,14 +250,13 @@ end
     title(['Present Location:' ,num2str(PresentID), ', Next possible location:',num2str(NextLanes)])
     plot(R(2:end,6),R(2:end,7),'b')
     plot(R(i - HalfLength:i - HalfLength + SmallWindow - 1 ,6),R(i - HalfLength:i - HalfLength + SmallWindow - 1,7),'r')
-%     PlotRelation(PresentID,WayData,RelationData)
-%     PlotRelation(NextLanes,WayData,RelationData)
+    PlotRelation(PresentID,NextLanes,WayData,RelationData)
     hold off 
     
 %% finish this loop, Clear data and step into next loop
 if K2 == 0
     StraightEndPoint = i + SmallWindow;
-    DriveDistance = (R(StraightEndPoint  - HalfLength,4) - R(StraightStartPoint - HalfLength,4)) * KL
+    DriveDistance = (R(StraightEndPoint  - HalfLength,4) - R(StraightStartPoint - HalfLength,4)) * KL;
 end   
     PatternDistance = 0;
     K1 = K2;
